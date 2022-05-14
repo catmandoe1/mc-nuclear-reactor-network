@@ -11,11 +11,11 @@ Keep in mind when copying over the hub code, it the ingame computers can only pa
 
 # From quest
 
-To run the code on the floppy disk you have to navigate onto the disk. All storage devices are listed in /mnt. So to access a disk with the address starting with 5b8, you will do:
-
+To run the code on the floppy disk you have to navigate onto the disk. All storage devices are listed in /mnt. So to access a disk with the address starting with ```5b8```, you will do:
+```
 cd /mnt/5b8
-
-Next typing ls will list whats in the directory.
+```
+Next typing ```ls``` will list whats in the directory.
 Then typing in the file name to run it.
 
 If there is a problem with any of the programs not starting right it will be that you haven't connected the fission reactor to the computer (cable attached to the computer must be attached to the fission controller or fission reactor port) or you don't have a wireless network card. Anything else is probally something to do your ingame computer.
@@ -28,5 +28,3 @@ The controller simply controls the reactor that it is connected to. It is only m
 
 ### Server
 The most expensive part of this, but is key. The server just has to be in range of both the controllers and the hub. Just run the script to start.
-
-If you lose the floppy disks or want more copys, you can use the copy command or you can go to the github:
