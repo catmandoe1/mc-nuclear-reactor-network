@@ -9,7 +9,7 @@ The server is the information storer. Just keeps data from reactor controllers o
 
 Keep in mind when copying over the hub code, it the ingame computers can only paste up to 257 lines of code, so you will have to copy and paste twice.
 
-# From quest:
+# From quest
 
 To run the code on the floppy disk you have to navigate onto the disk. All storage devices are listed in /mnt. So to access a disk with the address starting with 5b8, you will do:
 cd /mnt/5b8
