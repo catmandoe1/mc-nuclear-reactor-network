@@ -65,7 +65,7 @@ function listReactors()
 		print("")
 		print("In total, " .. reactorCount .. s .. "connected")
 	else
-		print("There are no reactors connected to the server")
+		print("There is no reactors connected to the server/no connection to server")
 	end
 	openPort(PORT, debug)
 end
@@ -96,7 +96,7 @@ function allReactorCommands()
 		elseif commandIn == "d" or commandIn == "D" then
 			m.broadcast(PORT, "reactor_forceOff_all")
 		elseif commandIn == "e" or commandIn == "E" then
-			break
+			return
 		else
 			print("Invalid input")
 		end
@@ -128,7 +128,8 @@ function selectListReactors()
 		selected = listidx[tonumber(io.read())]
 		
 	else
-		print("There is no reactors connected to the server")
+		print("There is no reactors connected to the server/no connection to server")
+		return true
 	end
 	openPort(PORT, debug)
 	if debug then print("returned selected number") end
@@ -250,7 +251,7 @@ function getReactorInforamtion(data)
 			print("Fuel power generation: " .. data.fuel.fuelPower .. " RF/t")
 			pressEnter()
 		elseif userIn == "f" or userIn == "F" then
-			break
+			return
 		else
 			print("Invalid input")
 		end
@@ -274,33 +275,35 @@ end
 function selectReactor()
 	--shows list of reactors connected and allows user to choose
 	local selected = selectListReactors()
-	if debug then print(selected) end
+	if debug then print(tostring(selected)) end
 	--commands
-	while true do
-		print("---")
-		print("a = Startup reactor")
-		print("b = Shutdown reactor")
-		print("c = Enable forceOn")
-		print("d = Disable forceOn")
-		print("e = Reactor Stats")
-		print("f - Back to main menu")
-		local userIn = io.read()
-		
-		if userIn == "a" or userIn == "A" then
-			startReactor(true, selected)
-		elseif userIn == "b" or userIn == "B" then
-			startReactor(false, selected)
-		elseif userIn == "c" or userIn == "C" then
-			enableForceOn(true, selected)
-		elseif userIn == "d" or userIn == "D" then
-			enableForceOn(true, selected)
-		elseif userIn == "e" or userIn == "E" then
-			getReactorInforamtion(selected)
-		elseif userIn == "f" or userIn == "F" then
-			openPort(PORT, debug)
-			break
-		else
-			print("Invalid input")
+	if selected ~= true then
+		while true do
+			print("---")
+			print("a = Startup reactor")
+			print("b = Shutdown reactor")
+			print("c = Enable forceOn")
+			print("d = Disable forceOn")
+			print("e = Reactor Stats")
+			print("f - Back to main menu")
+			local userIn = io.read()
+			
+			if userIn == "a" or userIn == "A" then
+				startReactor(true, selected)
+			elseif userIn == "b" or userIn == "B" then
+				startReactor(false, selected)
+			elseif userIn == "c" or userIn == "C" then
+				enableForceOn(true, selected)
+			elseif userIn == "d" or userIn == "D" then
+				enableForceOn(true, selected)
+			elseif userIn == "e" or userIn == "E" then
+				getReactorInforamtion(selected)
+			elseif userIn == "f" or userIn == "F" then
+				openPort(PORT, debug)
+				return
+			else
+				print("Invalid input")
+			end
 		end
 	end
 end
@@ -313,6 +316,8 @@ function debugOptions(userIn, debug)
 	elseif userIn == "b" or userIn == "B" then
 		m.broadcast(DATAPORT, "server_clearAllData")
 		return debug
+	elseif userIn == "c" or userIn == "C" then
+		return
 	else
 		print("Invalid input")
 		pressEnter()
