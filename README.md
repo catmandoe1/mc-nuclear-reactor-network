@@ -23,7 +23,7 @@ If there is a problem with any of the programs not starting right it will be tha
 The hub controls all the reactors (that have a controller on then) in the range of the modem. Theres singular-reactor commands and also all-reactor commands. singular-reactor commands only control the reactor that has been specifically chosen by the user. All-reactor commands have simple commands that affects all reactors connected to/in range of the hub.
 
 ### Controller
-§rThe controller simply controls the reactor that it is connected to. It is only ment to be connected to one reactor only. You have to enter a reactor ID which be the fuel type or whatever. This ID will show up on the hub. To connect the computer to the reactor you simply have a cable attached to the computer connect to the fission controller or the fission reactor port.
+The controller simply controls the reactor that it is connected to. It is only ment to be connected to one reactor only. You have to enter a reactor ID which be the fuel type or whatever. This ID will show up on the hub. To connect the computer to the reactor you simply have a cable attached to the computer connect to the fission controller or the fission reactor port.
 
 ### Server
 The most expensive part of this, but is key. The server just has to be in range of both the controllers and the hub. Just run the script to start.
