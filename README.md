@@ -12,6 +12,7 @@ Keep in mind when copying over the hub code, it the ingame computers can only pa
 # From quest
 
 To run the code on the floppy disk you have to navigate onto the disk. All storage devices are listed in /mnt. So to access a disk with the address starting with 5b8, you will do:
+
 cd /mnt/5b8
 
 Next typing ls will list whats in the directory.
