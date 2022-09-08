@@ -11,9 +11,9 @@ local isControllerActive = false
 local forceOnB = false
 local debug = false
 
-local PORT = 1
-local DATAPORT = 2
-local HUBPORT = 3
+local MSGPORT = 1 --hub commands
+local DATAPORT = 2 -- reactor data and server
+local HUBPORT = 3 -- unused
 
 function openPort(port, debug)
 	m.open(port)
@@ -30,44 +30,75 @@ function openPort(port, debug)
 	if debug then print("Successfully connected to port " .. port) end
 end
 
+--shuts down all reactors connected and "exits" program
 function shutDown()
+	local sendCommand = {}
+	local sendCommand2 = {}
 	print("---")
-	print("Are you sure?")
+	print("Are you sure? y/n")
 	local userIn = io.read()
 
 	if userIn == "y" or userIn == "Y" or userIn == "ye" or userIn == "yeah" or userIn == "yes" or userIn == "Yes" or userIn == "Yeah" or userIn == "yea" or userIn == "Yea" or userIn == "sure" or userIn == "Sure" or userIn == "i am" or userIn == "I am" then
-		active = false
+		--active = false
 		print("Deactivated reactors and disabled force-on")
-		m.broadcast(PORT, "reactor_deactivate_all")
-		m.broadcast(PORT, "reactor_forceOff_all")
+
+		sendCommand["type"] = "gobal_reactor_command"
+		sendCommand["cmd"] = "reactor_deactivate_all"
+		sendCommand2["type"] = "gobal_reactor_command"
+		sendCommand2["cmd"] = "reactor_forceOff_all"
+
+		sendCommand = serialization.serialize(sendCommand)
+		sendCommand2 = serialization.serialize(sendCommand2)
+
+		m.broadcast(MSGPORT, sendCommand)
+		m.broadcast(MSGPORT, sendCommand2)
+
 		print("")
+		return false
+	else
+		return true
 	end
 end
 
+--lists all reactors connected to the server
 function listReactors()
 	local reactorCount = 0
 	local s = " reactor "
+	local sendCommand = {}
+	sendCommand["type"] = "reactor_server_commands"
+	sendCommand["cmd"] = "hub_getInfo"
+	sendCommand = serialization.serialize(sendCommand)
 
 	print("---")
-	m.broadcast(DATAPORT, "hub_getInfo")
-	openPort(HUBPORT, debug)
+	m.broadcast(DATAPORT, sendCommand)
+	--openPort(HUBPORT, debug)
 	local mtype, _, _, _, _, message = event.pull(5, "modem_message")
-	if mtype == "modem_message" and message ~= nil and message ~= "{}" then
+	if mtype == "modem_message" and message ~= nil and message ~= "{}" and type(message) == "string" then
 		message = serialization.unserialize(message)
-		for k, v in pairs(message) do
-			print(k)
-			reactorCount = reactorCount + 1
+		if message ~= nil then
+			if message.type == "reactor_data_toHub" then
+				for k, v in pairs(message) do
+					if k ~= "type" then
+						print(k)
+						reactorCount = reactorCount + 1
+					end
+				end
+				if debug then print(tostring(reactorCount) .. " connected") end
+				if reactorCount > 1 then
+					s = " reactors "
+				end
+				print("")
+				print("In total, " .. reactorCount .. s .. "connected")
+			else
+				print("Invalid data received")
+			end
+		else
+			print("Invalid data received")
 		end
-		if debug then print(tostring(reactorCount) .. " connected") end
-		if reactorCount > 1 then
-			s = " reactors "
-		end
-		print("")
-		print("In total, " .. reactorCount .. s .. "connected")
 	else
 		print("There is no reactors connected to the server/no connection to server")
 	end
-	openPort(PORT, debug)
+	--openPort(MSGPORT, debug)
 end
 
 function pressEnter()
@@ -76,7 +107,14 @@ function pressEnter()
 	io.read()
 end
 
+--gobal reactor controls
 function allReactorCommands()
+	local reactorCommandPacket = {}
+	reactorCommandPacket["type"] = "gobal_reactor_command"
+	local actAll = "reactor_activate_all"
+	local deactAll = "reactor_deactivate_all"
+	local forceOnAll = "reactor_forceOn_all"
+	local forceOffAll = "reactor_forceOff_all"
 	local allCommandsActive = true
 	while allCommandsActive do
 		print("---")
@@ -88,13 +126,25 @@ function allReactorCommands()
 		local commandIn = io.read()
 
 		if commandIn == "a" or commandIn == "A" then
-			m.broadcast(PORT, "reactor_activate_all")
+			reactorCommandPacket["cmd"] = actAll
+			serReactorCommandPacket = serialization.serialize(reactorCommandPacket)
+			m.broadcast(MSGPORT, serReactorCommandPacket)
+			
 		elseif commandIn == "b" or commandIn == "B" then
-			m.broadcast(PORT, "reactor_deactivate_all")
+			reactorCommandPacket["cmd"] = deactAll
+			serReactorCommandPacket = serialization.serialize(reactorCommandPacket)
+			m.broadcast(MSGPORT, serReactorCommandPacket)
+
 		elseif commandIn == "c" or commandIn == "C" then
-			m.broadcast(PORT, "reactor_forceOn_all")
+			reactorCommandPacket["cmd"] = forceOnAll
+			serReactorCommandPacket = serialization.serialize(reactorCommandPacket)
+			m.broadcast(MSGPORT, serReactorCommandPacket)
+
 		elseif commandIn == "d" or commandIn == "D" then
-			m.broadcast(PORT, "reactor_forceOff_all")
+			reactorCommandPacket["cmd"] = forceOffAll
+			serReactorCommandPacket = serialization.serialize(reactorCommandPacket)
+			m.broadcast(MSGPORT, serReactorCommandPacket)
+
 		elseif commandIn == "e" or commandIn == "E" then
 			return
 		else
@@ -103,39 +153,56 @@ function allReactorCommands()
 	end
 end
 
+--lists all reactors and allows user to select a reactor for further controls
 function selectListReactors()
-	local selected = 0
+	local selected = {}
 	local index = 0
+	local sendCommand = {}
+	--requests data from server
+	sendCommand["type"] = "reactor_server_commands"
+	sendCommand["cmd"] = "hub_getInfo"
+	sendCommand = serialization.serialize(sendCommand)
 
 	print("---")
-	m.broadcast(DATAPORT, "hub_getInfo")
-	openPort(HUBPORT, debug)
+	m.broadcast(DATAPORT, sendCommand)
 	local mtype, _, _, _, _, message = event.pull(5, "modem_message")
-	if mtype == "modem_message" and message ~= nil and message ~= "{}" then
+	if mtype == "modem_message" and message ~= nil and message ~= "{}" and type(message) == "string" then
 		message = serialization.unserialize(message)
-		listidx ={}
-		for k, v in pairs(message) do
-			index = index + 1
-			print(index .. " = " .. k)
-			table.insert(listidx, v)
+		if message ~= nil then
+			if message.type == "reactor_data_toHub" then
+				listidx = {}
+				for k, v in pairs(message) do
+					if k ~= "type" then
+						index = index + 1
+						print(index .. " = " .. k)
+						table.insert(listidx, v) --adds a entry with a number and reactor information
 
-			if index%15 == 0 then
-				pressEnter()
+						if index%15 == 0 then
+							pressEnter()
+						end
+					end
+				end
+				print("")
+				print("Select a reactor to control (number):")
+				selected = listidx[tonumber(io.read())] -- sets "selected" as the information of the selected number
+			else
+				print("Data received was not reactor_data_toHub")
+				return true
 			end
+		else
+			print("Data received was nil")
+			return true
 		end
-		print("")
-		print("Select a reactor to control:")
-		selected = listidx[tonumber(io.read())]
-		
 	else
 		print("There is no reactors connected to the server/no connection to server")
 		return true
 	end
-	openPort(PORT, debug)
+	--openPort(MSGPORT, debug)
 	if debug then print("returned selected number") end
 	return selected
 end
 
+--returns on/off command for reactor depending on input
 function startReactor(status, data)
 	if debug then
 		print(data)
@@ -145,6 +212,7 @@ function startReactor(status, data)
 	local stopCMD = "reactor_deactivate"
 	local message = {}
 
+	message["type"] = "local_reactor_command"
 	message["id"] = data.id
 	if status then
 		message["cmd"] = startCMD
@@ -152,10 +220,11 @@ function startReactor(status, data)
 		message["cmd"] = stopCMD
 	end
 	send = serialization.serialize(message)
-	m.broadcast(PORT, send)
-	if debug then print("sent commands to port 1") end
+	m.broadcast(MSGPORT, send)
+	if debug then print("sent start/stop reactor commands to reactor " .. data.id .. " on port " .. MSGPORT) end
 end
 
+--forces reactor to stay active even if stored energy is full
 function enableForceOn(status, data)
 	if debug then
 		print(data)
@@ -165,6 +234,7 @@ function enableForceOn(status, data)
 	local disableCMD = "reactor_forceOff"
 	local message = {}
 
+	message["type"] = "local_reactor_command"
 	message["id"] = data.id
 	if status then
 		message["cmd"] = enableCMD
@@ -172,8 +242,8 @@ function enableForceOn(status, data)
 		message["cmd"] = disableCMD
 	end
 	send = serialization.serialize(message)
-	m.broadcast(PORT, send)
-	if debug then print("sent commands to port 1") end	
+	m.broadcast(MSGPORT, send)
+	if debug then print("sent enable/disable force on commands to reactor " .. data.id .. " on port " .. MSGPORT) end	
 end
 
 function getReactorInforamtion(data)
@@ -295,11 +365,11 @@ function selectReactor()
 			elseif userIn == "c" or userIn == "C" then
 				enableForceOn(true, selected)
 			elseif userIn == "d" or userIn == "D" then
-				enableForceOn(true, selected)
+				enableForceOn(false, selected)
 			elseif userIn == "e" or userIn == "E" then
 				getReactorInforamtion(selected)
 			elseif userIn == "f" or userIn == "F" then
-				openPort(PORT, debug)
+				openPort(MSGPORT, debug)
 				return
 			else
 				print("Invalid input")
@@ -308,23 +378,66 @@ function selectReactor()
 	end
 end
 
-function debugOptions(userIn, debug)
-	if userIn == "a" or userIn == "A" then
-		debug = not debug
-		print("debug set to " .. tostring(debug))
-		return debug
-	elseif userIn == "b" or userIn == "B" then
-		m.broadcast(DATAPORT, "server_clearAllData")
-		return debug
-	elseif userIn == "c" or userIn == "C" then
-		return
-	else
-		print("Invalid input")
-		pressEnter()
+--sends a 
+function commandSend(type, command, port)
+	local commandPacket = {}
+	commandPacket["type"] = type
+	commandPacket["cmd"] = command
+	serCommandPacket = serialization.serialize(commandPacket)
+	if debug then
+		print(serCommandPacket)
+	end
+	m.broadcast(port, serCommandPacket)
+end
+
+function debugOptions(debug)
+	while true do
+		print("---")
+		print("a = Turn off or on debugging")
+		print("b = Clear server memory data")
+		print("c = Delete server save data")
+		print("d = Soft shutdown server (stops script)")
+		print("e = Hard shutdown server (shuts down server)")
+		print("f = Back to main menu")
+		local userIn = io.read()
+
+		local commandType = "reactor_server_commands"
+		local clearMem = "reactorServer_clearMemoryData"
+		local wipeSave = "reactorServer_clearDiskData"
+		local softShutdown = "reactorServer_softShutdown"
+		local hardShutdown = "reactorServer_hardShutdown"
+
+		--local commands
+		if userIn == "a" or userIn == "A" then --enables computer debugging (ish)
+			debug = not debug
+			print("debug set to " .. tostring(debug))
+			return debug
+
+		--server commands
+		elseif userIn == "b" or userIn == "B" then --clears server's "data" value
+			--commandPacket["cmd"] = clearMem
+			--serCommandPacket = serialization.serialize(commandPacket)
+			--m.broadcast(DATAPORT, serCommandPacket)
+			commandSend(commandType, clearMem, DATAPORT)
+			return debug
+		elseif userIn == "c" or userIn == "C" then --deletes server savedata file
+			commandSend(commandType, wipeSave, DATAPORT)
+			return debug
+		elseif userIn == "d" or userIn == "D" then --terminates script
+			commandSend(commandType, softShutdown, DATAPORT)
+			return debug
+		elseif userIn == "e" or userIn == "E" then --turns off the server/computer in 10 seconds
+			commandSend(commandType, hardShutdown, DATAPORT)
+			return debug
+		elseif userIn == "f" or userIn == "F" then
+			return
+		else
+			print("Invalid input")
+		end
 	end
 end
 
-openPort(PORT, debug)
+openPort(MSGPORT, debug)
 
 while active do
 	print("---")
@@ -334,7 +447,7 @@ while active do
 	print("c = Show All-Reactor commands")
 	print("d = Debug")
 	print("e = Shutdown program (shuts down all reactors as well)")
-	userIn = io.read()
+	local userIn = io.read()
 	if userIn == "a" or userIn == "A" then
 		selectReactor()
 	elseif userIn == "b" or userIn == "B" then
@@ -343,15 +456,10 @@ while active do
 	elseif userIn == "c" or userIn == "C" then
 		allReactorCommands()
 	elseif userIn == "d" or userIn == "D" then
-		print("---")
-		print("a = Turn off or on debugging")
-		print("b = Clear server data")
-		userInDebug = io.read()
-
-		debug = debugOptions(userInDebug, debug)
-		openPort(PORT, debug)
+		debug = debugOptions(debug)
+		--openPort(MSGPORT, debug)
 	elseif userIn == "e" or userIn == "E" then
-		shutDown()
+		active = shutDown()
 	else
 		print("Invalid input")
 	end
