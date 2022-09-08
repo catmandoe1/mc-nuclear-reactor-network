@@ -10,20 +10,26 @@ local active = true
 local forceOn = false
 local isControllerActive = false
 local m = component.modem
-local MSGPORT = 1
-local DATAPORT = 2
+local MSGPORT = 1 --hub commands and reactor
+local DATAPORT = 2 -- reactor data and server
+local HUBPORT = 3 -- unused
 
 print("Enter reactor ID:")
+print("Must be different from other controllers")
 local ID = io.read()
 
 
-m.open(MSGPORT)
-isMSGPORTOpen = m.isOpen(MSGPORT)
-if isMSGPORTOpen == false then
-	print("failed to open to MSGPORT " .. MSGPORT)
-	m.open(MSGPORT)
-else
-	print("succesfully opened to MSGPORT " .. MSGPORT)
+function openPort(port)
+	m.open(port)
+	isPortOpen = m.isOpen(port)
+	while not isPortOpen do
+		print("Failed to connect to port " .. port)
+		print("retrying in 5 seconds...")
+		os.sleep(5)
+		m.open(port)
+		isPortOpen = m.isOpen(port)
+	end
+	print("Successfully connected to port " .. port)
 end
 
 function sendFuel()
@@ -61,6 +67,7 @@ end
 function sendAllStats()
 	--sending all data about reactor to the data port
 	local data = {}
+	data["type"] = "reactor_data"
 	data["id"] = ID
 	data["fuel"] = sendFuel()
 	data["energy"] = sendEnergy()
@@ -81,13 +88,16 @@ function stopReactor()
 	print("turning reactor off")
 end
 
+openPort(MSGPORT)
 --main loop
 while active do
+	--reactor controller
 	if isControllerActive then
 		currentPower = reactor.getEnergyStored()
 		maxPower = reactor.getMaxEnergyStored()
 		currentHeat = reactor.getHeatLevel()
 		maxHeat = reactor.getMaxHeatLevel()
+
 		if currentHeat < (0.90 * maxHeat) then
 			if forceOn == false then
 				if currentPower > (0.90 * maxPower) then
@@ -103,9 +113,11 @@ while active do
 		end
 	end
 
-	local mtype, _, _, incomingMSGPORT, _, message = event.pull(1, "modem_message")
+	--computer communication
+	local mtype, _, _, incomingMSGPORT, _, message = event.pull(5, "modem_message")
 	if mtype == "modem_message" and message ~= nil then
-		--all types - come in string form
+		print("message received")
+		--[[gobal reactor commands - come in string form
 		if message == "reactor_deactivate_all" then
 			stopReactor()
 		end
@@ -118,28 +130,50 @@ while active do
 		elseif message == "reactor_forceOff_all" then
 			forceOn = false
 			print("turned off forceOn")
-		end
-		--single types - comes in table form
+		end]]
+		--id only commands - comes in string table form
 		message = serialization.unserialize(message)
-		if message ~= nil then
-			if message.id == ID then
-				if message.cmd == "reactor_deactivate" then
-					isControllerActive = false
-					reactor.deactivate()
-					print("turning reactor off")
-				elseif message.cmd == "reactor_activate" then
-					isControllerActive = true
-					reactor.activate()
-					print("turning reactor on")
-				elseif message.cmd == "reactor_forceOn" then
+		print(message)
+		if message ~= nil and type(message) == "table" and message.type ~= nil then
+			print("message valid")
+			print(message.type)
+			if message.type == "local_reactor_command" then
+				print("message local")
+				if message.id == ID then
+					if message.cmd == "reactor_deactivate" then
+						isControllerActive = false
+						reactor.deactivate()
+						print("turning reactor off")
+					elseif message.cmd == "reactor_activate" then
+						isControllerActive = true
+						reactor.activate()
+						print("turning reactor on")
+					elseif message.cmd == "reactor_forceOn" then
+						forceOn = true
+						print("turned on forceOn")
+					elseif message.cmd == "reactor_forceOff" then
+						forceOn = false
+						print("turned off forceOn")
+					elseif message.cmd == "reactor_sendStats" then
+						sendAllStats()
+					end
+				end
+			elseif message.type == "gobal_reactor_command" then
+				print("message global")
+				if message.cmd == "reactor_deactivate_all" then
+					stopReactor()
+				elseif message.cmd == "reactor_activate_all" then
+					startReactor()
+				elseif message.cmd == "reactor_forceOn_all" then
 					forceOn = true
-				elseif message.cmd == "reactor_forceOff" then
+					print("turned on forceOn")
+				elseif message.cmd == "reactor_forceOff_all" then
 					forceOn = false
-				elseif message.cmd == "reactor_sendStats" then
-					sendAllStats()
+					print("turned off forceOn")
 				end
 			end
 		end
 	end
+	--sends all stats of reactor to main ~every second
 	sendAllStats()
 end
